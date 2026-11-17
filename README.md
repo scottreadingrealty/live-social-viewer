@@ -12,6 +12,9 @@ In **All Columns** view, drag any divider between accounts to resize the two
 neighboring columns. Custom widths are saved automatically. Double-click a
 divider to reset those columns.
 
+In **Grid Wrap**, drag a card's right edge to resize that card; the remaining
+cards automatically reflow around it.
+
 ## Bookmarkable launcher
 
 [Open Live Social Viewer](https://scottreadingrealty.github.io/live-social-viewer/)

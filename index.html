@@ -175,8 +175,7 @@
     }
 
     .columns.grid .column {
-      flex: 1 0 calc(33.333% - 8px) !important;
-      width: auto !important;
+      flex-basis: calc(33.333% - 8px);
       height: calc(50% - 4px);
       min-height: 420px;
     }
@@ -191,9 +190,9 @@
 
     .resize-handle {
       position: absolute;
-      z-index: 8;
+      z-index: 20;
       top: 46px;
-      right: 0;
+      right: -6px;
       bottom: 0;
       width: 12px;
       cursor: col-resize;
@@ -218,8 +217,10 @@
       box-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
     }
 
-    .columns.grid .resize-handle,
-    .columns.focus .resize-handle { display: none; }
+    .columns.focus .resize-handle,
+    .columns:not(.grid):not(.focus) .column:last-child .resize-handle {
+      display: none;
+    }
 
     body.column-resizing {
       cursor: col-resize;
@@ -485,25 +486,34 @@
       handle.setAttribute('aria-label', `Resize ${column.querySelector('.account-name').textContent} column`);
 
       handle.addEventListener('pointerdown', (event) => {
-        if (activeView !== 'all' || event.button !== 0) return;
+        if (activeView === 'focus' || event.button !== 0) return;
+        const isGridResize = activeView === 'grid';
+        if (!isGridResize && !nextColumn) return;
         event.preventDefault();
+        event.stopPropagation();
+        handle.setPointerCapture(event.pointerId);
 
         const startX = event.clientX;
         const startWidth = column.getBoundingClientRect().width;
-        const startNextWidth = nextColumn.getBoundingClientRect().width;
+        const startNextWidth = nextColumn?.getBoundingClientRect().width || 0;
         const minimumDelta = MIN_COLUMN_WIDTH - startWidth;
-        const maximumDelta = startNextWidth - MIN_COLUMN_WIDTH;
+        const maximumGridWidth = Math.max(MIN_COLUMN_WIDTH, columns.clientWidth - 16);
+        const maximumDelta = isGridResize
+          ? maximumGridWidth - startWidth
+          : startNextWidth - MIN_COLUMN_WIDTH;
 
         setColumnWidth(column, startWidth);
-        setColumnWidth(nextColumn, startNextWidth);
+        if (!isGridResize) setColumnWidth(nextColumn, startNextWidth);
         column.classList.add('resizing');
-        nextColumn.classList.add('resizing');
+        if (!isGridResize) nextColumn.classList.add('resizing');
         document.body.classList.add('column-resizing');
 
         function onPointerMove(moveEvent) {
           const delta = Math.min(maximumDelta, Math.max(minimumDelta, moveEvent.clientX - startX));
           columnWidths[column.dataset.id] = setColumnWidth(column, startWidth + delta);
-          columnWidths[nextColumn.dataset.id] = setColumnWidth(nextColumn, startNextWidth - delta);
+          if (!isGridResize) {
+            columnWidths[nextColumn.dataset.id] = setColumnWidth(nextColumn, startNextWidth - delta);
+          }
         }
 
         function finishResize() {
@@ -511,7 +521,7 @@
           document.removeEventListener('pointerup', finishResize);
           document.removeEventListener('pointercancel', finishResize);
           column.classList.remove('resizing');
-          nextColumn.classList.remove('resizing');
+          if (!isGridResize) nextColumn.classList.remove('resizing');
           document.body.classList.remove('column-resizing');
           saveColumnWidths();
         }
@@ -523,11 +533,13 @@
 
       handle.addEventListener('dblclick', () => {
         delete columnWidths[column.dataset.id];
-        delete columnWidths[nextColumn.dataset.id];
         column.style.removeProperty('flex');
         column.style.removeProperty('width');
-        nextColumn.style.removeProperty('flex');
-        nextColumn.style.removeProperty('width');
+        if (activeView !== 'grid' && nextColumn) {
+          delete columnWidths[nextColumn.dataset.id];
+          nextColumn.style.removeProperty('flex');
+          nextColumn.style.removeProperty('width');
+        }
         saveColumnWidths();
       });
 
@@ -572,8 +584,8 @@
       });
 
       const renderedColumns = [...columns.querySelectorAll('.column')];
-      renderedColumns.slice(0, -1).forEach((column, index) => {
-        attachResizeHandle(column, renderedColumns[index + 1]);
+      renderedColumns.forEach((column, index) => {
+        attachResizeHandle(column, renderedColumns[index + 1] || null);
       });
 
       if (!focusedId || !accounts.some((account) => account.id === focusedId)) {
