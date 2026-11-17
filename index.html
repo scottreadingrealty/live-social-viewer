@@ -161,10 +161,11 @@
     }
 
     .column {
+      position: relative;
       display: flex;
       flex: 1 0 300px;
       flex-direction: column;
-      min-width: 300px;
+      min-width: 240px;
       min-height: 0;
       overflow: hidden;
       border: 1px solid var(--border);
@@ -174,7 +175,8 @@
     }
 
     .columns.grid .column {
-      flex-basis: calc(33.333% - 8px);
+      flex: 1 0 calc(33.333% - 8px) !important;
+      width: auto !important;
       height: calc(50% - 4px);
       min-height: 420px;
     }
@@ -182,9 +184,49 @@
     .columns.focus .column { display: none; }
     .columns.focus .column.focused {
       display: flex;
-      flex: 1 1 100%;
+      flex: 1 1 100% !important;
+      width: auto !important;
       min-width: 0;
     }
+
+    .resize-handle {
+      position: absolute;
+      z-index: 8;
+      top: 46px;
+      right: 0;
+      bottom: 0;
+      width: 12px;
+      cursor: col-resize;
+      touch-action: none;
+    }
+
+    .resize-handle::after {
+      position: absolute;
+      top: 12px;
+      right: 3px;
+      bottom: 12px;
+      width: 2px;
+      border-radius: 2px;
+      background: rgba(139, 92, 246, 0);
+      content: '';
+      transition: background 140ms ease, box-shadow 140ms ease;
+    }
+
+    .resize-handle:hover::after,
+    .column.resizing .resize-handle::after {
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
+    }
+
+    .columns.grid .resize-handle,
+    .columns.focus .resize-handle { display: none; }
+
+    body.column-resizing {
+      cursor: col-resize;
+      user-select: none;
+    }
+
+    body.column-resizing webview { pointer-events: none; }
 
     .column-header {
       display: flex;
@@ -365,6 +407,8 @@
   <script>
     const STORAGE_KEY = 'social-command-center.accounts.v1';
     const REFRESH_KEY = 'social-command-center.refresh.v1';
+    const WIDTHS_KEY = 'social-command-center.column-widths.v1';
+    const MIN_COLUMN_WIDTH = 240;
 
     const platforms = {
       facebook: { name: 'Facebook', short: 'f', url: 'https://www.facebook.com/', color: '#1877f2' },
@@ -391,6 +435,17 @@
     let activeView = 'all';
     let focusedId = null;
 
+    function loadColumnWidths() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(WIDTHS_KEY));
+        return saved && typeof saved === 'object' ? saved : {};
+      } catch {
+        return {};
+      }
+    }
+
+    let columnWidths = loadColumnWidths();
+
     function loadAccounts() {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -410,6 +465,75 @@
       return `persist:${id.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
     }
 
+    function setColumnWidth(column, width) {
+      const safeWidth = Math.max(MIN_COLUMN_WIDTH, Math.round(width));
+      column.style.flex = `0 0 ${safeWidth}px`;
+      column.style.width = `${safeWidth}px`;
+      return safeWidth;
+    }
+
+    function saveColumnWidths() {
+      localStorage.setItem(WIDTHS_KEY, JSON.stringify(columnWidths));
+    }
+
+    function attachResizeHandle(column, nextColumn) {
+      const handle = document.createElement('div');
+      handle.className = 'resize-handle';
+      handle.title = 'Drag to resize these columns. Double-click to reset.';
+      handle.setAttribute('role', 'separator');
+      handle.setAttribute('aria-orientation', 'vertical');
+      handle.setAttribute('aria-label', `Resize ${column.querySelector('.account-name').textContent} column`);
+
+      handle.addEventListener('pointerdown', (event) => {
+        if (activeView !== 'all' || event.button !== 0) return;
+        event.preventDefault();
+
+        const startX = event.clientX;
+        const startWidth = column.getBoundingClientRect().width;
+        const startNextWidth = nextColumn.getBoundingClientRect().width;
+        const minimumDelta = MIN_COLUMN_WIDTH - startWidth;
+        const maximumDelta = startNextWidth - MIN_COLUMN_WIDTH;
+
+        setColumnWidth(column, startWidth);
+        setColumnWidth(nextColumn, startNextWidth);
+        column.classList.add('resizing');
+        nextColumn.classList.add('resizing');
+        document.body.classList.add('column-resizing');
+
+        function onPointerMove(moveEvent) {
+          const delta = Math.min(maximumDelta, Math.max(minimumDelta, moveEvent.clientX - startX));
+          columnWidths[column.dataset.id] = setColumnWidth(column, startWidth + delta);
+          columnWidths[nextColumn.dataset.id] = setColumnWidth(nextColumn, startNextWidth - delta);
+        }
+
+        function finishResize() {
+          document.removeEventListener('pointermove', onPointerMove);
+          document.removeEventListener('pointerup', finishResize);
+          document.removeEventListener('pointercancel', finishResize);
+          column.classList.remove('resizing');
+          nextColumn.classList.remove('resizing');
+          document.body.classList.remove('column-resizing');
+          saveColumnWidths();
+        }
+
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', finishResize);
+        document.addEventListener('pointercancel', finishResize);
+      });
+
+      handle.addEventListener('dblclick', () => {
+        delete columnWidths[column.dataset.id];
+        delete columnWidths[nextColumn.dataset.id];
+        column.style.removeProperty('flex');
+        column.style.removeProperty('width');
+        nextColumn.style.removeProperty('flex');
+        nextColumn.style.removeProperty('width');
+        saveColumnWidths();
+      });
+
+      column.append(handle);
+    }
+
     function render() {
       columns.replaceChildren();
       focusAccount.replaceChildren();
@@ -425,6 +549,7 @@
         column.className = 'column';
         column.dataset.id = account.id;
         column.style.setProperty('--service-color', platform.color);
+        if (columnWidths[account.id]) setColumnWidth(column, columnWidths[account.id]);
         column.innerHTML = `
           <div class="column-header">
             <span class="service-dot">${platform.short}</span>
@@ -444,6 +569,11 @@
         column.append(webview);
         column.querySelector('.refresh-one').addEventListener('click', () => webview.reload());
         columns.append(column);
+      });
+
+      const renderedColumns = [...columns.querySelectorAll('.column')];
+      renderedColumns.slice(0, -1).forEach((column, index) => {
+        attachResizeHandle(column, renderedColumns[index + 1]);
       });
 
       if (!focusedId || !accounts.some((account) => account.id === focusedId)) {

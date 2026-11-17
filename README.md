@@ -8,6 +8,10 @@ A desktop Electron dashboard with persistent account sessions for Facebook, Inst
 
 This stable URL always points to the asset attached to the newest GitHub release.
 
+In **All Columns** view, drag any divider between accounts to resize the two
+neighboring columns. Custom widths are saved automatically. Double-click a
+divider to reset those columns.
+
 ## Bookmarkable launcher
 
 [Open Live Social Viewer](https://scottreadingrealty.github.io/live-social-viewer/)
