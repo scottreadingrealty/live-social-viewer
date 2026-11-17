@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0b10">
+  <title>Open Live Social Viewer</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="site.webmanifest">
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: #f5f5f7;
+      background: radial-gradient(circle at 50% 15%, #26235e 0, #111323 34%, #08090d 72%);
+    }
+    main {
+      width: min(520px, 100%);
+      padding: 44px;
+      text-align: center;
+      border: 1px solid rgba(255, 255, 255, .1);
+      border-radius: 24px;
+      background: rgba(17, 18, 25, .86);
+      box-shadow: 0 28px 90px rgba(0, 0, 0, .45);
+      backdrop-filter: blur(18px);
+    }
+    .icon {
+      width: 92px;
+      height: 92px;
+      margin-bottom: 18px;
+      filter: drop-shadow(0 0 24px rgba(99, 102, 241, .45));
+    }
+    h1 { margin: 0 0 10px; font-size: clamp(28px, 6vw, 40px); letter-spacing: -.04em; }
+    p { margin: 0 auto 26px; max-width: 390px; color: #a8adbd; line-height: 1.55; }
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 50px;
+      padding: 0 22px;
+      border: 0;
+      border-radius: 12px;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(135deg, #7577ff, #5651dd);
+      box-shadow: 0 12px 30px rgba(99, 102, 241, .25);
+      font: inherit;
+      font-weight: 750;
+      text-decoration: none;
+    }
+    .button:hover { filter: brightness(1.08); }
+    .secondary { margin-top: 20px; font-size: 13px; color: #81889a; }
+    .secondary a { color: #a9abff; }
+    #status { min-height: 21px; margin: 16px 0 0; color: #8d93a4; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <main>
+    <img class="icon" src="icon.svg" alt="">
+    <h1>Live Social Viewer</h1>
+    <p>Open your five-column social dashboard for Facebook, Instagram, X, TikTok, and YouTube Shorts.</p>
+    <button class="button" id="openDashboard" type="button">Open Dashboard</button>
+    <div id="status" aria-live="polite"></div>
+    <div class="secondary">
+      App not installed? <a href="https://github.com/scottreadingrealty/live-social-viewer/releases/latest/download/Live-Social-Viewer-win32-x64.zip">Download the latest Windows version</a>
+    </div>
+  </main>
+  <script>
+    const button = document.getElementById('openDashboard');
+    const status = document.getElementById('status');
+
+    function openDashboard() {
+      status.textContent = 'Opening the desktop dashboard…';
+      window.location.href = 'live-social-viewer://open';
+      window.setTimeout(() => {
+        status.textContent = 'If nothing opened, run the downloaded app once, then try again.';
+      }, 1800);
+    }
+
+    button.addEventListener('click', openDashboard);
+  </script>
+</body>
+</html>
+

@@ -8,6 +8,14 @@ A desktop Electron dashboard with persistent account sessions for Facebook, Inst
 
 This stable URL always points to the asset attached to the newest GitHub release.
 
+## Bookmarkable launcher
+
+[Open Live Social Viewer](https://scottreadingrealty.github.io/live-social-viewer/)
+
+Bookmark or pin the HTTPS link above. It launches the installed dashboard through
+the registered `live-social-viewer://open` protocol instead of opening Electron by
+itself.
+
 > Windows Smart App Control may block the current unsigned build. A trusted code-signing certificate is required for warning-free distribution.
 
 ## Development
