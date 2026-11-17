@@ -12,8 +12,11 @@ In **All Columns** view, drag any divider between accounts to resize the two
 neighboring columns. Custom widths are saved automatically. Double-click a
 divider to reset those columns.
 
-In **Grid Wrap**, drag a card's right edge to resize that card; the remaining
-cards automatically reflow around it.
+In **Grid Wrap**, every tile is independently resizable. Drag its right edge,
+bottom edge, or bottom-right corner to make it wide, narrow, short, or tall.
+Tiles snap to a 12-column grid, automatically pack around each other, and save
+their layout. Double-click an edge to reset that dimension or the corner to
+reset the whole tile.
 
 ## Bookmarkable launcher
 

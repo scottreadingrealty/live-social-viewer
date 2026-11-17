@@ -154,10 +154,13 @@
     }
 
     .columns.grid {
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      grid-auto-flow: dense;
+      grid-auto-rows: 80px;
       overflow-x: hidden;
       overflow-y: auto;
-      align-content: stretch;
+      align-content: start;
     }
 
     .column {
@@ -175,9 +178,11 @@
     }
 
     .columns.grid .column {
-      flex-basis: calc(33.333% - 8px);
-      height: calc(50% - 4px);
-      min-height: 420px;
+      width: auto !important;
+      min-width: 0;
+      min-height: 0;
+      grid-column: span 4;
+      grid-row: span 5;
     }
 
     .columns.focus .column { display: none; }
@@ -217,6 +222,71 @@
       box-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
     }
 
+    .columns.grid .resize-handle::after {
+      background: rgba(99, 102, 241, 0.25);
+    }
+
+    .columns.grid .resize-handle {
+      right: 0;
+      width: 14px;
+    }
+
+    .grid-height-handle,
+    .grid-corner-handle {
+      position: absolute;
+      z-index: 20;
+      display: none;
+      touch-action: none;
+    }
+
+    .grid-height-handle {
+      right: 0;
+      bottom: 0;
+      left: 0;
+      height: 14px;
+      cursor: row-resize;
+    }
+
+    .grid-height-handle::after {
+      position: absolute;
+      right: 12px;
+      bottom: 3px;
+      left: 12px;
+      height: 2px;
+      border-radius: 2px;
+      background: rgba(99, 102, 241, 0.25);
+      content: '';
+      transition: background 140ms ease, box-shadow 140ms ease;
+    }
+
+    .grid-height-handle:hover::after,
+    .column.resizing .grid-height-handle::after {
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
+    }
+
+    .grid-corner-handle {
+      right: 0;
+      bottom: 0;
+      width: 20px;
+      height: 20px;
+      cursor: nwse-resize;
+      border-right: 3px solid rgba(99, 102, 241, 0.55);
+      border-bottom: 3px solid rgba(99, 102, 241, 0.55);
+      border-radius: 0 0 6px 0;
+    }
+
+    .grid-corner-handle:hover,
+    .column.resizing .grid-corner-handle {
+      border-color: var(--accent);
+      filter: drop-shadow(0 0 5px rgba(139, 92, 246, 0.9));
+    }
+
+    .columns.grid .grid-height-handle,
+    .columns.grid .grid-corner-handle {
+      display: block;
+    }
+
     .columns.focus .resize-handle,
     .columns:not(.grid):not(.focus) .column:last-child .resize-handle {
       display: none;
@@ -227,7 +297,19 @@
       user-select: none;
     }
 
-    body.column-resizing webview { pointer-events: none; }
+    body.grid-row-resizing {
+      cursor: row-resize;
+      user-select: none;
+    }
+
+    body.grid-corner-resizing {
+      cursor: nwse-resize;
+      user-select: none;
+    }
+
+    body.column-resizing webview,
+    body.grid-row-resizing webview,
+    body.grid-corner-resizing webview { pointer-events: none; }
 
     .column-header {
       display: flex;
@@ -409,7 +491,16 @@
     const STORAGE_KEY = 'social-command-center.accounts.v1';
     const REFRESH_KEY = 'social-command-center.refresh.v1';
     const WIDTHS_KEY = 'social-command-center.column-widths.v1';
+    const GRID_LAYOUT_KEY = 'social-command-center.grid-layout.v1';
     const MIN_COLUMN_WIDTH = 240;
+    const GRID_COLUMNS = 12;
+    const GRID_GAP = 8;
+    const GRID_ROW_HEIGHT = 80;
+    const DEFAULT_GRID_COLUMN_SPAN = 4;
+    const DEFAULT_GRID_ROW_SPAN = 5;
+    const MIN_GRID_COLUMN_SPAN = 2;
+    const MIN_GRID_ROW_SPAN = 3;
+    const MAX_GRID_ROW_SPAN = 18;
 
     const platforms = {
       facebook: { name: 'Facebook', short: 'f', url: 'https://www.facebook.com/', color: '#1877f2' },
@@ -447,6 +538,17 @@
 
     let columnWidths = loadColumnWidths();
 
+    function loadGridLayout() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(GRID_LAYOUT_KEY));
+        return saved && typeof saved === 'object' ? saved : {};
+      } catch {
+        return {};
+      }
+    }
+
+    let gridLayout = loadGridLayout();
+
     function loadAccounts() {
       try {
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -473,14 +575,42 @@
       return safeWidth;
     }
 
-    function saveColumnWidths() {
+    function clamp(value, minimum, maximum) {
+      return Math.min(maximum, Math.max(minimum, value));
+    }
+
+    function getGridItemLayout(column) {
+      const saved = gridLayout[column.dataset.id] || {};
+      return {
+        columnSpan: clamp(Math.round(saved.columnSpan || DEFAULT_GRID_COLUMN_SPAN), MIN_GRID_COLUMN_SPAN, GRID_COLUMNS),
+        rowSpan: clamp(Math.round(saved.rowSpan || DEFAULT_GRID_ROW_SPAN), MIN_GRID_ROW_SPAN, MAX_GRID_ROW_SPAN)
+      };
+    }
+
+    function setGridItemLayout(column, layout) {
+      const safeLayout = {
+        columnSpan: clamp(Math.round(layout.columnSpan), MIN_GRID_COLUMN_SPAN, GRID_COLUMNS),
+        rowSpan: clamp(Math.round(layout.rowSpan), MIN_GRID_ROW_SPAN, MAX_GRID_ROW_SPAN)
+      };
+      column.style.gridColumn = `span ${safeLayout.columnSpan}`;
+      column.style.gridRow = `span ${safeLayout.rowSpan}`;
+      return safeLayout;
+    }
+
+    function gridColumnStep() {
+      const contentWidth = Math.max(1, columns.clientWidth - 16);
+      return ((contentWidth - ((GRID_COLUMNS - 1) * GRID_GAP)) / GRID_COLUMNS) + GRID_GAP;
+    }
+
+    function saveLayouts() {
       localStorage.setItem(WIDTHS_KEY, JSON.stringify(columnWidths));
+      localStorage.setItem(GRID_LAYOUT_KEY, JSON.stringify(gridLayout));
     }
 
     function attachResizeHandle(column, nextColumn) {
       const handle = document.createElement('div');
       handle.className = 'resize-handle';
-      handle.title = 'Drag to resize these columns. Double-click to reset.';
+      handle.title = 'Drag the right edge to resize. Double-click to reset width.';
       handle.setAttribute('role', 'separator');
       handle.setAttribute('aria-orientation', 'vertical');
       handle.setAttribute('aria-label', `Resize ${column.querySelector('.account-name').textContent} column`);
@@ -494,24 +624,30 @@
         handle.setPointerCapture(event.pointerId);
 
         const startX = event.clientX;
+        const startLayout = getGridItemLayout(column);
         const startWidth = column.getBoundingClientRect().width;
         const startNextWidth = nextColumn?.getBoundingClientRect().width || 0;
         const minimumDelta = MIN_COLUMN_WIDTH - startWidth;
-        const maximumGridWidth = Math.max(MIN_COLUMN_WIDTH, columns.clientWidth - 16);
-        const maximumDelta = isGridResize
-          ? maximumGridWidth - startWidth
-          : startNextWidth - MIN_COLUMN_WIDTH;
+        const maximumDelta = startNextWidth - MIN_COLUMN_WIDTH;
 
-        setColumnWidth(column, startWidth);
-        if (!isGridResize) setColumnWidth(nextColumn, startNextWidth);
+        if (!isGridResize) {
+          setColumnWidth(column, startWidth);
+          setColumnWidth(nextColumn, startNextWidth);
+        }
         column.classList.add('resizing');
         if (!isGridResize) nextColumn.classList.add('resizing');
         document.body.classList.add('column-resizing');
 
         function onPointerMove(moveEvent) {
-          const delta = Math.min(maximumDelta, Math.max(minimumDelta, moveEvent.clientX - startX));
-          columnWidths[column.dataset.id] = setColumnWidth(column, startWidth + delta);
-          if (!isGridResize) {
+          if (isGridResize) {
+            const columnDelta = Math.round((moveEvent.clientX - startX) / gridColumnStep());
+            gridLayout[column.dataset.id] = setGridItemLayout(column, {
+              ...startLayout,
+              columnSpan: startLayout.columnSpan + columnDelta
+            });
+          } else {
+            const delta = Math.min(maximumDelta, Math.max(minimumDelta, moveEvent.clientX - startX));
+            columnWidths[column.dataset.id] = setColumnWidth(column, startWidth + delta);
             columnWidths[nextColumn.dataset.id] = setColumnWidth(nextColumn, startNextWidth - delta);
           }
         }
@@ -523,7 +659,7 @@
           column.classList.remove('resizing');
           if (!isGridResize) nextColumn.classList.remove('resizing');
           document.body.classList.remove('column-resizing');
-          saveColumnWidths();
+          saveLayouts();
         }
 
         document.addEventListener('pointermove', onPointerMove);
@@ -532,18 +668,102 @@
       });
 
       handle.addEventListener('dblclick', () => {
-        delete columnWidths[column.dataset.id];
-        column.style.removeProperty('flex');
-        column.style.removeProperty('width');
+        if (activeView === 'grid') {
+          gridLayout[column.dataset.id] = setGridItemLayout(column, {
+            ...getGridItemLayout(column),
+            columnSpan: DEFAULT_GRID_COLUMN_SPAN
+          });
+        } else {
+          delete columnWidths[column.dataset.id];
+          column.style.removeProperty('flex');
+          column.style.removeProperty('width');
+        }
         if (activeView !== 'grid' && nextColumn) {
           delete columnWidths[nextColumn.dataset.id];
           nextColumn.style.removeProperty('flex');
           nextColumn.style.removeProperty('width');
         }
-        saveColumnWidths();
+        saveLayouts();
       });
 
       column.append(handle);
+    }
+
+    function attachGridResizeHandles(column) {
+      const heightHandle = document.createElement('div');
+      heightHandle.className = 'grid-height-handle';
+      heightHandle.title = 'Drag the bottom edge to resize height. Double-click to reset height.';
+      heightHandle.setAttribute('role', 'separator');
+      heightHandle.setAttribute('aria-orientation', 'horizontal');
+      heightHandle.setAttribute('aria-label', `Resize ${column.querySelector('.account-name').textContent} height`);
+
+      const cornerHandle = document.createElement('div');
+      cornerHandle.className = 'grid-corner-handle';
+      cornerHandle.title = 'Drag the corner to resize width and height. Double-click to reset this tile.';
+      cornerHandle.setAttribute('role', 'separator');
+      cornerHandle.setAttribute('aria-label', `Resize ${column.querySelector('.account-name').textContent} tile`);
+
+      function beginGridResize(event, resizeWidth, resizeHeight) {
+        if (activeView !== 'grid' || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.setPointerCapture(event.pointerId);
+
+        const startX = event.clientX;
+        const startY = event.clientY;
+        const startLayout = getGridItemLayout(column);
+        const bodyClass = resizeWidth && resizeHeight
+          ? 'grid-corner-resizing'
+          : resizeHeight ? 'grid-row-resizing' : 'column-resizing';
+
+        column.classList.add('resizing');
+        document.body.classList.add(bodyClass);
+
+        function onPointerMove(moveEvent) {
+          const nextLayout = { ...startLayout };
+          if (resizeWidth) {
+            nextLayout.columnSpan = startLayout.columnSpan
+              + Math.round((moveEvent.clientX - startX) / gridColumnStep());
+          }
+          if (resizeHeight) {
+            nextLayout.rowSpan = startLayout.rowSpan
+              + Math.round((moveEvent.clientY - startY) / (GRID_ROW_HEIGHT + GRID_GAP));
+          }
+          gridLayout[column.dataset.id] = setGridItemLayout(column, nextLayout);
+        }
+
+        function finishResize() {
+          document.removeEventListener('pointermove', onPointerMove);
+          document.removeEventListener('pointerup', finishResize);
+          document.removeEventListener('pointercancel', finishResize);
+          column.classList.remove('resizing');
+          document.body.classList.remove(bodyClass);
+          saveLayouts();
+        }
+
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', finishResize);
+        document.addEventListener('pointercancel', finishResize);
+      }
+
+      heightHandle.addEventListener('pointerdown', (event) => beginGridResize(event, false, true));
+      cornerHandle.addEventListener('pointerdown', (event) => beginGridResize(event, true, true));
+
+      heightHandle.addEventListener('dblclick', () => {
+        gridLayout[column.dataset.id] = setGridItemLayout(column, {
+          ...getGridItemLayout(column),
+          rowSpan: DEFAULT_GRID_ROW_SPAN
+        });
+        saveLayouts();
+      });
+
+      cornerHandle.addEventListener('dblclick', () => {
+        delete gridLayout[column.dataset.id];
+        setGridItemLayout(column, getGridItemLayout(column));
+        saveLayouts();
+      });
+
+      column.append(heightHandle, cornerHandle);
     }
 
     function render() {
@@ -561,7 +781,6 @@
         column.className = 'column';
         column.dataset.id = account.id;
         column.style.setProperty('--service-color', platform.color);
-        if (columnWidths[account.id]) setColumnWidth(column, columnWidths[account.id]);
         column.innerHTML = `
           <div class="column-header">
             <span class="service-dot">${platform.short}</span>
@@ -586,6 +805,7 @@
       const renderedColumns = [...columns.querySelectorAll('.column')];
       renderedColumns.forEach((column, index) => {
         attachResizeHandle(column, renderedColumns[index + 1] || null);
+        attachGridResizeHandles(column);
       });
 
       if (!focusedId || !accounts.some((account) => account.id === focusedId)) {
@@ -600,6 +820,16 @@
       focusAccount.classList.toggle('visible', activeView === 'focus');
       columns.querySelectorAll('.column').forEach((column) => {
         column.classList.toggle('focused', column.dataset.id === focusedId);
+        column.style.removeProperty('flex');
+        column.style.removeProperty('width');
+        column.style.removeProperty('grid-column');
+        column.style.removeProperty('grid-row');
+
+        if (activeView === 'all' && columnWidths[column.dataset.id]) {
+          setColumnWidth(column, columnWidths[column.dataset.id]);
+        } else if (activeView === 'grid') {
+          setGridItemLayout(column, getGridItemLayout(column));
+        }
       });
     }
 
