@@ -1,0 +1,59 @@
+name: Publish Windows release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Package Windows app
+        run: npm run package-win
+
+      - name: Create release archive
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -LiteralPath 'dist\Live Social Viewer-win32-x64' `
+            -DestinationPath 'Live-Social-Viewer-win32-x64.zip' `
+            -CompressionLevel Optimal `
+            -Force
+
+      - name: Publish or replace release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = node -p "require('./package.json').version"
+          $tag = "v$version"
+          $asset = 'Live-Social-Viewer-win32-x64.zip'
+
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset --clobber
+          } else {
+            gh release create $tag $asset `
+              --title "Live Social Viewer $version" `
+              --notes "Windows x64 release of Live Social Viewer. This build is currently unsigned and may be blocked by Windows Smart App Control." `
+              --target $env:GITHUB_SHA `
+              --latest
+          }
+

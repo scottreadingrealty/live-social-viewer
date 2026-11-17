@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Social Command Center</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080b12;
+      --panel: #101521;
+      --panel-2: #171d2b;
+      --border: rgba(255, 255, 255, 0.09);
+      --text: #f6f7fb;
+      --muted: #9099aa;
+      --accent: #8b5cf6;
+      --accent-2: #6d4aff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, select, input { font: inherit; }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .topbar {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      min-height: 68px;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(12, 16, 25, 0.96);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.24);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: max-content;
+      font-weight: 760;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-mark {
+      display: grid;
+      grid-template-columns: repeat(2, 7px);
+      gap: 3px;
+      padding: 7px;
+      border-radius: 9px;
+      background: linear-gradient(145deg, var(--accent), #4f46e5);
+      box-shadow: 0 0 22px rgba(139, 92, 246, 0.34);
+    }
+
+    .brand-mark i {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: white;
+      opacity: 0.9;
+    }
+
+    .view-switcher {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #090d15;
+    }
+
+    .view-button, .add-button, .icon-button, .modal-button {
+      border: 0;
+      cursor: pointer;
+      color: var(--muted);
+    }
+
+    .view-button {
+      padding: 8px 12px;
+      border-radius: 7px;
+      background: transparent;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .view-button:hover { color: var(--text); }
+    .view-button.active {
+      color: white;
+      background: var(--panel-2);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+
+    .focus-control { display: none; min-width: 150px; }
+    .focus-control.visible { display: block; }
+
+    .spacer { flex: 1; }
+
+    .field-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    select, input {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      outline: none;
+      color: var(--text);
+      background: #0b0f18;
+    }
+
+    select { padding: 8px 30px 8px 10px; }
+    select:focus, input:focus { border-color: rgba(139, 92, 246, 0.7); }
+
+    .add-button {
+      padding: 9px 14px;
+      border-radius: 9px;
+      color: white;
+      background: linear-gradient(145deg, var(--accent), var(--accent-2));
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 8px 22px rgba(109, 74, 255, 0.2);
+    }
+
+    .columns {
+      display: flex;
+      flex: 1;
+      gap: 8px;
+      min-height: 0;
+      padding: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .columns.grid {
+      flex-wrap: wrap;
+      overflow-x: hidden;
+      overflow-y: auto;
+      align-content: stretch;
+    }
+
+    .column {
+      display: flex;
+      flex: 1 0 300px;
+      flex-direction: column;
+      min-width: 300px;
+      min-height: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.18);
+    }
+
+    .columns.grid .column {
+      flex-basis: calc(33.333% - 8px);
+      height: calc(50% - 4px);
+      min-height: 420px;
+    }
+
+    .columns.focus .column { display: none; }
+    .columns.focus .column.focused {
+      display: flex;
+      flex: 1 1 100%;
+      min-width: 0;
+    }
+
+    .column-header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      height: 46px;
+      padding: 0 11px;
+      border-bottom: 1px solid var(--border);
+      background: #121824;
+    }
+
+    .service-dot {
+      display: grid;
+      width: 24px;
+      height: 24px;
+      place-items: center;
+      border-radius: 7px;
+      color: white;
+      font-size: 11px;
+      font-weight: 800;
+      background: var(--service-color, #6d4aff);
+    }
+
+    .account-meta {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .account-name {
+      overflow: hidden;
+      font-size: 12px;
+      font-weight: 720;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .account-service {
+      color: var(--muted);
+      font-size: 10px;
+      margin-top: 1px;
+    }
+
+    .icon-button {
+      display: grid;
+      width: 27px;
+      height: 27px;
+      place-items: center;
+      border-radius: 7px;
+      background: transparent;
+      font-size: 16px;
+    }
+
+    .icon-button:hover { color: white; background: rgba(255, 255, 255, 0.07); }
+
+    webview {
+      display: flex;
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      background: white;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      z-index: 100;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      background: rgba(2, 4, 9, 0.76);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-backdrop.open { display: grid; }
+
+    .modal {
+      width: min(430px, 100%);
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #111622;
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55);
+    }
+
+    .modal h2 { margin: 0 0 5px; font-size: 20px; }
+    .modal p { margin: 0 0 20px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+    .form-field { display: grid; gap: 7px; margin: 14px 0; }
+    .form-field label { color: #c3c8d3; font-size: 12px; font-weight: 650; }
+    .form-field input, .form-field select { width: 100%; padding: 10px 11px; }
+
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+    .modal-button { padding: 9px 15px; border-radius: 8px; font-weight: 700; }
+    .modal-button.cancel { background: #1a202d; color: #c3c8d3; }
+    .modal-button.save { background: var(--accent); color: white; }
+
+    .empty-state {
+      display: grid;
+      flex: 1;
+      place-items: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 1050px) {
+      .brand span { display: none; }
+      .topbar { gap: 10px; }
+      .view-button { padding-inline: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span>Social Command Center</span>
+      </div>
+
+      <nav class="view-switcher" aria-label="Column layout">
+        <button class="view-button active" data-view="all">All Columns</button>
+        <button class="view-button" data-view="grid">Grid Wrap</button>
+        <button class="view-button" data-view="focus">Single Focus</button>
+      </nav>
+
+      <select id="focusAccount" class="focus-control" aria-label="Focused account"></select>
+
+      <div class="spacer"></div>
+
+      <label class="field-inline">
+        Auto-Refresh
+        <select id="refreshInterval" aria-label="Auto-refresh interval">
+          <option value="0">Off</option>
+          <option value="60000">1m</option>
+          <option value="300000">5m</option>
+          <option value="900000">15m</option>
+        </select>
+      </label>
+
+      <button id="addAccount" class="add-button">+ Add Account</button>
+    </header>
+
+    <main id="columns" class="columns" aria-live="polite"></main>
+  </div>
+
+  <div id="accountModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <form id="accountForm" class="modal">
+      <h2 id="modalTitle">Add another account</h2>
+      <p>Create a separate, persistent browser session for an additional social account.</p>
+
+      <div class="form-field">
+        <label for="service">Platform</label>
+        <select id="service" required>
+          <option value="facebook">Facebook</option>
+          <option value="instagram">Instagram</option>
+          <option value="x">X</option>
+          <option value="tiktok">TikTok</option>
+          <option value="youtube">YouTube Shorts</option>
+        </select>
+      </div>
+
+      <div class="form-field">
+        <label for="accountName">Account label</label>
+        <input id="accountName" type="text" maxlength="40" placeholder="e.g. Brand Account" required>
+      </div>
+
+      <div class="form-field">
+        <label for="accountUrl">Starting URL (optional)</label>
+        <input id="accountUrl" type="url" placeholder="Uses the platform home page by default">
+      </div>
+
+      <div class="modal-actions">
+        <button id="cancelModal" class="modal-button cancel" type="button">Cancel</button>
+        <button class="modal-button save" type="submit">Add Account</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'social-command-center.accounts.v1';
+    const REFRESH_KEY = 'social-command-center.refresh.v1';
+
+    const platforms = {
+      facebook: { name: 'Facebook', short: 'f', url: 'https://www.facebook.com/', color: '#1877f2' },
+      instagram: { name: 'Instagram', short: 'IG', url: 'https://www.instagram.com/', color: '#d94676' },
+      x: { name: 'X', short: 'X', url: 'https://x.com/', color: '#252a32' },
+      tiktok: { name: 'TikTok', short: 'TT', url: 'https://www.tiktok.com/', color: '#111111' },
+      youtube: { name: 'YouTube Shorts', short: 'YT', url: 'https://www.youtube.com/shorts', color: '#ff0033' }
+    };
+
+    const defaultAccounts = [
+      { id: 'facebook-main', service: 'facebook', name: 'Facebook', url: platforms.facebook.url },
+      { id: 'instagram-main', service: 'instagram', name: 'Instagram', url: platforms.instagram.url },
+      { id: 'x-main', service: 'x', name: 'X', url: platforms.x.url },
+      { id: 'tiktok-main', service: 'tiktok', name: 'TikTok', url: platforms.tiktok.url },
+      { id: 'youtube-main', service: 'youtube', name: 'YouTube Shorts', url: platforms.youtube.url }
+    ];
+
+    const columns = document.getElementById('columns');
+    const focusAccount = document.getElementById('focusAccount');
+    const refreshSelect = document.getElementById('refreshInterval');
+    const modal = document.getElementById('accountModal');
+    const form = document.getElementById('accountForm');
+    let refreshTimer = null;
+    let activeView = 'all';
+    let focusedId = null;
+
+    function loadAccounts() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        return Array.isArray(saved) && saved.length ? saved : defaultAccounts;
+      } catch {
+        return defaultAccounts;
+      }
+    }
+
+    let accounts = loadAccounts();
+
+    function saveAccounts() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts));
+    }
+
+    function safePartition(id) {
+      return `persist:${id.toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
+    }
+
+    function render() {
+      columns.replaceChildren();
+      focusAccount.replaceChildren();
+
+      accounts.forEach((account) => {
+        const platform = platforms[account.service] || platforms.x;
+        const option = document.createElement('option');
+        option.value = account.id;
+        option.textContent = account.name;
+        focusAccount.append(option);
+
+        const column = document.createElement('section');
+        column.className = 'column';
+        column.dataset.id = account.id;
+        column.style.setProperty('--service-color', platform.color);
+        column.innerHTML = `
+          <div class="column-header">
+            <span class="service-dot">${platform.short}</span>
+            <div class="account-meta">
+              <div class="account-name"></div>
+              <div class="account-service">${platform.name}</div>
+            </div>
+            <button class="icon-button refresh-one" type="button" title="Refresh ${account.name}" aria-label="Refresh ${account.name}">↻</button>
+          </div>`;
+        column.querySelector('.account-name').textContent = account.name;
+
+        const webview = document.createElement('webview');
+        webview.src = account.url || platform.url;
+        webview.partition = safePartition(account.id);
+        webview.setAttribute('allowpopups', '');
+        webview.setAttribute('webpreferences', 'contextIsolation=yes');
+        column.append(webview);
+        column.querySelector('.refresh-one').addEventListener('click', () => webview.reload());
+        columns.append(column);
+      });
+
+      if (!focusedId || !accounts.some((account) => account.id === focusedId)) {
+        focusedId = accounts[0]?.id || null;
+      }
+      if (focusedId) focusAccount.value = focusedId;
+      applyView();
+    }
+
+    function applyView() {
+      columns.className = `columns ${activeView === 'all' ? '' : activeView}`.trim();
+      focusAccount.classList.toggle('visible', activeView === 'focus');
+      columns.querySelectorAll('.column').forEach((column) => {
+        column.classList.toggle('focused', column.dataset.id === focusedId);
+      });
+    }
+
+    function setRefreshTimer(value) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+      localStorage.setItem(REFRESH_KEY, value);
+      const interval = Number(value);
+      if (interval > 0) {
+        refreshTimer = setInterval(() => {
+          document.querySelectorAll('webview').forEach((webview) => webview.reload());
+        }, interval);
+      }
+    }
+
+    document.querySelectorAll('.view-button').forEach((button) => {
+      button.addEventListener('click', () => {
+        activeView = button.dataset.view;
+        document.querySelectorAll('.view-button').forEach((item) => item.classList.toggle('active', item === button));
+        applyView();
+      });
+    });
+
+    focusAccount.addEventListener('change', () => {
+      focusedId = focusAccount.value;
+      applyView();
+    });
+
+    refreshSelect.value = localStorage.getItem(REFRESH_KEY) || '0';
+    setRefreshTimer(refreshSelect.value);
+    refreshSelect.addEventListener('change', () => setRefreshTimer(refreshSelect.value));
+
+    function openModal() {
+      modal.classList.add('open');
+      document.getElementById('accountName').focus();
+    }
+
+    function closeModal() {
+      modal.classList.remove('open');
+      form.reset();
+    }
+
+    document.getElementById('addAccount').addEventListener('click', openModal);
+    document.getElementById('cancelModal').addEventListener('click', closeModal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && modal.classList.contains('open')) closeModal();
+    });
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const service = document.getElementById('service').value;
+      const name = document.getElementById('accountName').value.trim();
+      const customUrl = document.getElementById('accountUrl').value.trim();
+      const id = `${service}-${Date.now().toString(36)}`;
+      accounts.push({ id, service, name, url: customUrl || platforms[service].url });
+      saveAccounts();
+      focusedId = id;
+      render();
+      closeModal();
+    });
+
+    render();
+  </script>
+</body>
+</html>
+
